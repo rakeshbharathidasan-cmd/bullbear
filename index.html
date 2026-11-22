@@ -114,6 +114,32 @@ header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 @keyframes burst{to{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
 .conf{position:fixed;top:-12px;z-index:50;width:9px;height:14px;pointer-events:none;animation:fall var(--d) linear forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+/* v2: real charts · pattern quiz · honest odds */
+.stack.real{height:560px}
+.srcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:var(--s2);border:1px solid var(--line);margin-bottom:10px}
+.srcs button{min-height:44px;border-radius:11px;font-weight:700;font-size:14px;color:var(--muted)}
+.srcs button.on{background:var(--grad);color:#fff;font-weight:800}
+.mode.wide{grid-column:1/-1;min-height:96px}
+.lesson{margin-top:8px;padding:9px 11px;border-radius:12px;background:color-mix(in srgb,var(--a2) 14%,transparent);border:1px dashed color-mix(in srgb,var(--a2) 50%,transparent);font-size:13px;line-height:1.45}
+.lesson b{color:var(--text)}
+.reveal{font-size:13.5px;margin-top:6px;line-height:1.4}
+.reveal b{font-size:15px}
+.qopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.qopts button{min-height:56px;border-radius:15px;background:var(--s2);border:1.5px solid var(--line2);font-weight:800;font-size:14.5px;padding:6px 8px;transition:transform .15s}
+.qopts button:active{transform:scale(.95)}
+.qopts button.right{background:var(--up);color:#03140d;border-color:var(--up);box-shadow:0 0 18px var(--up)}
+.qopts button.wrong{background:var(--dn);color:#fff;border-color:var(--dn)}
+.odds{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 10px;align-items:center;font-size:13.5px}
+.odds .h{font-size:11px;font-weight:800;letter-spacing:.8px;color:var(--muted);text-transform:uppercase}
+.odds .bar{grid-column:1/-1;height:6px;border-radius:99px;background:var(--s3);position:relative;margin-bottom:6px;overflow:hidden}
+.odds .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;transform-origin:left;animation:growX .8s both}
+.odds .bar s{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.6;text-decoration:none}
+@keyframes growX{from{transform:scaleX(0)}}
+.verdict{border-radius:16px;padding:14px;text-align:center;border:2px solid var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 40%,transparent)}
+.verdict b{display:block;font-family:Sora,sans-serif;font-size:30px}
+.pg{padding:10px 0;border-bottom:1px solid var(--line)}.pg:last-child{border-bottom:0}
+.pg .t{display:flex;justify-content:space-between;gap:8px;font-weight:800}
+.pg p{margin:3px 0 0;font-size:13px;color:var(--muted);line-height:1.4}
 /* tiles */
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tile{position:relative;overflow:hidden;border-radius:20px;padding:13px;min-height:100px;color:var(--oc);text-align:left;
@@ -225,8 +251,8 @@ const fmt = n => Math.round(n).toLocaleString('en-IN');
 const lum = h => { const n = parseInt(String(h).slice(1), 16); return ((n >> 16) * .299 + (n >> 8 & 255) * .587 + (n & 255) * .114) / 255; };
 
 const TILE0 = {acc:'#2ec5ff', games:'#7c5cff', coins:'#f5c542', streak:'#ff4fa3'};
-const fresh = () => ({v:1, coins:200, games:[], tot:{n:0, ok:0}, best:{daily:0, endless:0, streak:0}, wish:[], set:{theme:'aurora', tt:0, sound:true, haptic:true, timer:0, tiles:{...TILE0}, btn:{}}});
-let S; try { S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || 'null') || {}); S.set = {...fresh().set, ...(S.set || {})}; S.set.tiles = {...TILE0, ...(S.set.tiles || {})}; S.best = {...fresh().best, ...(S.best || {})}; } catch(e) { S = fresh(); }
+const fresh = () => ({v:1, coins:200, games:[], tot:{n:0, ok:0}, real:{n:0, ok:0}, sim:{n:0, ok:0}, quiz:{n:0, ok:0}, src:'real', best:{daily:0, endless:0, streak:0}, wish:[], set:{theme:'aurora', tt:0, sound:true, haptic:true, timer:0, tiles:{...TILE0}, btn:{}}});
+let S; try { S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY) || 'null') || {}); S.set = {...fresh().set, ...(S.set || {})}; S.set.tiles = {...TILE0, ...(S.set.tiles || {})}; S.best = {...fresh().best, ...(S.best || {})}; ['real','sim','quiz'].forEach(k => S[k] = S[k] || {n:0, ok:0}); S.src = S.src || 'real'; } catch(e) { S = fresh(); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} $('coins').textContent = fmt(S.coins); wishBadge(); };
 
 /* ============ themes ============ */
@@ -310,39 +336,81 @@ function chartSVG(cd, reveal){
   [.25, .5, .75].forEach(f => g += `<line x1="0" x2="${W}" y1="${(H * f).toFixed(1)}" y2="${(H * f).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`);
   cd.k.forEach((x, i) => { const cx = 6 + i * sp + sp / 2, col = x.c >= x.o ? 'var(--up)' : 'var(--dn)', top = Y(Math.max(x.o, x.c)), bh = Math.max(1.5, Math.abs(Y(x.o) - Y(x.c)));
     g += `<g class="grow" style="animation-delay:${i * 18}ms"><line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${Y(x.h).toFixed(1)}" y2="${Y(x.l).toFixed(1)}" stroke="${col}" stroke-width="1.6"/><rect x="${(cx - cw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${cw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${col}"/></g>`; });
+  if (cd.opts) { const lx = 6 + (n - 2) * sp + sp / 2; g += `<rect x="${(lx - sp * .62).toFixed(1)}" y="2" width="${(sp * 1.24).toFixed(1)}" height="${H - 4}" rx="6" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="5 4" class="qbox"/>`; }
   const L = cd.k[cd.k.length - 1], ly = Y(L.c).toFixed(1), cx = 6 + (n - 1) * sp + sp / 2;
   g += `<line x1="0" x2="${W}" y1="${ly}" y2="${ly}" stroke="var(--text)" stroke-width="1" stroke-dasharray="4 4" opacity=".45"/>`;
+  if (cd.opts && !reveal) return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Candlestick chart">${g}</svg>`;
   if (reveal) { const x = cd.nx, col = x.c >= x.o ? 'var(--up)' : 'var(--dn)', top = Y(Math.max(x.o, x.c)), bh = Math.max(2, Math.abs(Y(x.o) - Y(x.c)));
     g += `<g class="grow"><line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${Y(x.h).toFixed(1)}" y2="${Y(x.l).toFixed(1)}" stroke="${col}" stroke-width="2"/><rect x="${(cx - cw / 2 - 1).toFixed(1)}" y="${top.toFixed(1)}" width="${(cw + 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${col}" style="filter:drop-shadow(0 0 6px ${col})"/></g>`; }
   else { const by = Math.max(10, Y(L.c) - 38); g += `<rect class="qbox" x="${(cx - cw / 2 - 2).toFixed(1)}" y="${by.toFixed(1)}" width="${(cw + 4).toFixed(1)}" height="76" rx="3" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="4 3"/><text x="${Math.min(W - 12, cx + cw).toFixed(1)}" y="${(by + 44).toFixed(1)}" font-size="22" font-weight="800" fill="var(--gold)" font-family="Sora,sans-serif">?</text>`; }
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Candlestick chart">${g}</svg>`;
 }
 
+/* ============ real NSE charts ============ */
+let REAL = null, RECENT = [];
+const PAT = {
+  breakout:{n:'Breakout', tb:'bull', d:'Closed above the highest high of the last 20 days.'},
+  breakdown:{n:'Breakdown', tb:'bear', d:'Closed below the lowest low of the last 20 days.'},
+  bull_engulf:{n:'Bullish engulfing', tb:'bull', d:'A green body fully swallows the previous red body.'},
+  bear_engulf:{n:'Bearish engulfing', tb:'bear', d:'A red body fully swallows the previous green body.'},
+  hammer:{n:'Hammer', tb:'bull', d:'Small body with a long lower wick after a fall: buyers stepped in.'},
+  shooting:{n:'Shooting star', tb:'bear', d:'Small body with a long upper wick after a rise: sellers pushed back.'},
+  gap_up:{n:'Gap up', tb:'bull', d:'Opened above the previous day\'s high.'},
+  gap_down:{n:'Gap down', tb:'bear', d:'Opened below the previous day\'s low.'},
+  doji:{n:'Doji', tb:'neutral', d:'Open and close almost equal: indecision.'},
+  three_green:{n:'Three green candles', tb:'bull', d:'Three up days in a row: short-term momentum.'},
+  three_red:{n:'Three red candles', tb:'bear', d:'Three down days in a row: short-term selling.'},
+  none:{n:'No clear pattern', tb:'neutral', d:'Nothing textbook on the last candle.'},
+};
+const TBW = {bull:'Bullish', bear:'Bearish', neutral:'Neutral'};
+async function loadReal(){ try { const r = await fetch('real.json'); REAL = await r.json(); if (UI.tab === 'play' && !G) render(); } catch(e) { REAL = null; } }
+const pst = k => REAL && REAL.stats[k] ? REAL.stats[k] : null;
+const pct = (a, b) => b ? a / b * 100 : 0;
+function makeRealCard(deck){
+  const list = REAL[deck]; let w, tries = 0; do { w = list[Math.floor(Math.random() * list.length)]; } while (RECENT.includes(w) && tries++ < 40);
+  RECENT.push(w); if (RECENT.length > 120) RECENT.shift();
+  const ks = w.k.map(([o, h, l, c]) => ({o, h, l, c})), nx = ks.pop(), L = ks[ks.length - 1];
+  return {real:true, sym:w.s, name:REAL.names[w.s] || w.s.toUpperCase(), d:w.d, dn:w.dn, p:w.p, tf:'daily', k:ks, nx, up:nx.c > L.c};
+}
+const nd = s => { const [y, m, d] = s.split('-'); return `${+d} ${MON[+m - 1]} ${y}`; };
+function oddsLine(k){ const st = pst(k); if (!st) return ''; return `in ${REAL.from}–${REAL.to.slice(0, 4)} data, the next day closed higher <b>${pct(st.up, st.n).toFixed(1)}%</b> of ${fmt(st.n)} times (all days: ${pct(REAL.base.up, REAL.base.n).toFixed(1)}%)`; }
+
 /* ============ game ============ */
 let G = null, TMR = null;
 const UI = {tab:'play', armed:null};
-function startGame(mode){ G = {mode, total:mode === 'daily' ? 10 : Infinity, lives:3, res:[], coins:0, streak:0, bestStreak:0, card:makeCard(), reveal:false, hint:false, busy:false, t0:Date.now()}; snd('start'); buzz(20); render(true); startTimer(); }
-function startTimer(){ clearInterval(TMR); if (!S.set.timer || !G || G.done) return; const T = S.set.timer * 1000, st = Date.now();
+function nextCard(){ if (G.mode === 'quiz') return quizCard(); return G.src === 'real' && REAL ? makeRealCard('cards') : makeCard(); }
+function quizCard(){ const c = makeRealCard('quiz'), keys = Object.keys(PAT).filter(k => k !== 'none' && k !== c.p).sort(() => Math.random() - .5).slice(0, 3);
+  c.opts = [...keys, c.p].sort(() => Math.random() - .5); return c; }
+function startGame(mode){ if ((mode === 'quiz' || S.src === 'real') && !REAL) { toast('Real charts are still loading. Using simulated charts.'); if (mode === 'quiz') return; }
+  G = {mode, src:mode === 'quiz' ? 'real' : (S.src === 'real' && REAL ? 'real' : 'sim'), total:mode === 'endless' ? Infinity : 10, lives:3, res:[], coins:0, streak:0, bestStreak:0, reveal:false, hint:false, busy:false, t0:Date.now()}; G.card = nextCard(); snd('start'); buzz(20); render(true); startTimer(); }
+function startTimer(){ clearInterval(TMR); if (!S.set.timer || !G || G.done || G.mode === 'quiz') return; const T = S.set.timer * 1000, st = Date.now();
   TMR = setInterval(() => { const el = $('tbar'); const left = 1 - (Date.now() - st) / T; if (el) el.style.transform = `scaleX(${Math.max(0, left)})`; if (left <= 0) { clearInterval(TMR); answer(null); } else if (left < .3 && Math.random() < .3) snd('tick'); }, 100); }
 function answer(dir, ev){
-  if (!G || G.busy || G.done) return; G.busy = true; clearInterval(TMR);
+  if (!G || G.busy || G.done || G.mode === 'quiz') return; G.busy = true; clearInterval(TMR);
   const ok = dir != null && (dir === 'up') === G.card.up, sc = $('sc'), r = sc ? sc.getBoundingClientRect() : {left:innerWidth / 2, top:innerHeight / 2, width:0, height:0};
-  G.reveal = true; G.res.push(ok); S.tot.n++;
+  G.reveal = true; G.pick = dir; G.res.push(ok); S.tot.n++; S[G.src].n++; if (ok) S[G.src].ok++;
   if (ok) { G.streak++; G.bestStreak = Math.max(G.bestStreak, G.streak); const pts = 100 + Math.min(G.streak - 1, 5) * 20; G.coins += pts; S.coins += pts; S.tot.ok++;
     snd(G.streak >= 3 ? 'streak' : 'win'); buzz([20, 40, 20]); }
   else { G.streak = 0; if (G.mode === 'endless') G.lives--; snd('lose'); buzz([60, 40, 60]); }
   save(); renderPlay();
   const sc2 = $('sc'); if (sc2) { sc2.classList.add(ok ? 'good' : 'bad'); const st = sc2.querySelector('.stamp'); if (st) { st.style.setProperty('--c', ok ? 'var(--up)' : 'var(--dn)'); st.textContent = ok ? 'RIGHT!' : dir == null ? 'TIME UP' : 'WRONG'; st.animate([{opacity:0, transform:'translate(-50%,-50%) rotate(-12deg) scale(2)'}, {opacity:1, transform:'translate(-50%,-50%) rotate(-12deg) scale(1)'}], {duration:300, fill:'forwards', easing:'cubic-bezier(.3,1.5,.5,1)'}); } }
   if (ok) { burst(r.left + r.width / 2, r.top + r.height / 3, ['#2ee59d', '#ffc54d', '#fff']); floatTxt('+' + (100 + Math.min(G.streak - 1, 5) * 20), r.left + r.width / 2, r.top + r.height / 3); }
-  setTimeout(() => { const s3 = $('sc'); if (s3) { s3.classList.add(G.card.up ? 'flyU' : 'flyD'); snd('swipe'); } }, 1100);
-  setTimeout(() => { const over = G.res.length >= G.total || G.lives <= 0; if (over) return endGame(); G.card = makeCard(); G.reveal = false; G.hint = false; G.busy = false; renderPlay(); startTimer(); }, 1600);
+  setTimeout(() => { const s3 = $('sc'); if (s3) { s3.classList.add(G.card.up ? 'flyU' : 'flyD'); snd('swipe'); } }, G.src === 'real' ? 2700 : 1100);
+  setTimeout(() => { const over = G.res.length >= G.total || G.lives <= 0; if (over) return endGame(); G.card = nextCard(); G.reveal = false; G.hint = false; G.busy = false; renderPlay(); startTimer(); }, G.src === 'real' ? 3200 : 1600);
 }
 function endGame(){
   G.done = true; clearInterval(TMR); const ok = G.res.filter(Boolean).length, n = G.res.length;
-  const rec = {id:uid(), t:Date.now(), mode:G.mode, n, ok, coins:G.coins, streak:G.bestStreak}; S.games.push(rec); if (S.games.length > 300) S.games.shift();
-  const key = G.mode; const nb = ok > (S.best[key] || 0); if (nb) S.best[key] = ok; if (G.bestStreak > S.best.streak) S.best.streak = G.bestStreak;
+  const rec = {id:uid(), t:Date.now(), mode:G.mode, src:G.src, n, ok, coins:G.coins, streak:G.bestStreak}; S.games.push(rec); if (S.games.length > 300) S.games.shift();
+  const key = G.mode; const nb = ok > (S.best[key] || 0); if (nb) S.best[key] = ok; if (G.mode === 'quiz') {} if (G.bestStreak > S.best.streak) S.best.streak = G.bestStreak;
   G.newBest = nb; save(); snd('end'); if (nb || ok / Math.max(1, n) >= .7) confetti(); render(true);
 }
+function quizAnswer(k){
+  if (!G || G.busy || G.done) return; G.busy = true; const ok = k === G.card.p; G.pick = k; G.reveal = true; G.res.push(ok); S.quiz.n++; S.tot.n++;
+  if (ok) { G.streak++; G.bestStreak = Math.max(G.bestStreak, G.streak); const pts = 80 + Math.min(G.streak - 1, 5) * 20; G.coins += pts; S.coins += pts; S.quiz.ok++; S.tot.ok++; snd(G.streak >= 3 ? 'streak' : 'win'); buzz([20, 40, 20]); }
+  else { G.streak = 0; snd('lose'); buzz([60, 40, 60]); }
+  save(); renderPlay(); const sc = $('sc'); if (sc) { const r = sc.getBoundingClientRect(); sc.classList.add(ok ? 'good' : 'bad'); if (ok) burst(r.left + r.width / 2, r.top + r.height / 3, ['#2ee59d', '#ffc54d', '#fff']); }
+}
+function quizNext(){ if (!G) return; if (G.res.length >= G.total) return endGame(); G.card = quizCard(); G.reveal = false; G.busy = false; G.pick = null; snd('swipe'); renderPlay(); }
 function hint(){ if (!G || G.reveal || G.hint) return; if (S.coins < 50) { snd('lose'); return toast('You need 50 coins for a hint'); } S.coins -= 50; G.hint = true; save(); snd('hint'); renderPlay(); }
 
 /* ============ views ============ */
@@ -354,16 +422,19 @@ const BEAR = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke
 function playV(){
   if (!G) return startV();
   if (G.done) return endV();
+  if (G.mode === 'quiz') return quizV();
   const cd = G.card, L = cd.k[cd.k.length - 1], prev = cd.k[cd.k.length - 2], ch = (L.c / prev.c - 1) * 100, n = G.res.length;
   const prog = G.mode === 'daily' ? `<div class="prog" aria-label="Card ${n + 1} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < n ? (G.res[i] ? 'ok' : 'bad') : i === n ? 'cur' : ''}"></i>`).join('')}</div>`
     : `<div class="lives" aria-label="${G.lives} lives">${[0, 1, 2].map(i => `<svg width="24" height="24" viewBox="0 0 24 24" fill="${i < G.lives ? 'var(--dn)' : 'var(--s3)'}" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6C19 16.5 12 21 12 21z"/></svg>`).join('')}</div>`;
   const nxCh = G.reveal ? (cd.nx.c / cd.nx.o - 1) * 100 : 0;
   return `${prog}<div class="hintU">Swipe up · BULL</div>
-    <div class="stack"><div class="bk a"></div><div class="bk b"></div>
-      <article class="sc" id="sc"><div class="nm"><b>${cd.name}</b><span>simulated · ${cd.tf} candles</span></div>
-        <div class="px">${rs(G.reveal ? cd.nx.c : L.c)} <small style="color:${(G.reveal ? nxCh : ch) >= 0 ? 'var(--up)' : 'var(--dn)'}">${(G.reveal ? nxCh : ch) >= 0 ? '▲' : '▼'} ${Math.abs(G.reveal ? nxCh : ch).toFixed(2)}%</small></div>
+    <div class="stack${cd.real ? ' real' : ''}"><div class="bk a"></div><div class="bk b"></div>
+      <article class="sc" id="sc"><div class="nm"><b>${cd.real && !G.reveal ? 'Mystery NSE stock' : cd.name}</b><span>${cd.real ? (G.reveal ? nd(cd.d) + ' → ' + nd(cd.dn) : 'real · daily candles') : 'simulated · ' + cd.tf + ' candles'}</span></div>
+        <div class="px">${cd.real && !G.reveal ? '₹ hidden' : rs(G.reveal ? cd.nx.c : L.c)} <small style="color:${(G.reveal ? nxCh : ch) >= 0 ? 'var(--up)' : 'var(--dn)'}">${(G.reveal ? nxCh : ch) >= 0 ? '▲' : '▼'} ${Math.abs(G.reveal ? nxCh : ch).toFixed(2)}%</small></div>
         ${chartSVG(cd, G.reveal)}
-        <div class="hint">${G.reveal ? `Closed ${cd.up ? 'higher' : 'lower'}: ${rs(cd.nx.o)} → ${rs(cd.nx.c)}` : G.hint ? `💡 ${cd.why} Signals lean ${cd.pUp >= .5 ? 'Bull' : 'Bear'} ${Math.round(Math.max(cd.pUp, 1 - cd.pUp) * 100)}%.` : 'Where will the next candle close?'}</div>
+        <div class="hint">${G.reveal ? (cd.real ? `<div class="reveal"><b>${esc(cd.name)}</b> closed ${cd.up ? 'higher' : 'lower'} on ${nd(cd.dn)}: ${rs(L.c)} → ${rs(cd.nx.c)}</div>` : `Closed ${cd.up ? 'higher' : 'lower'}: ${rs(cd.nx.o)} → ${rs(cd.nx.c)}`)
+          : G.hint ? (cd.real ? `💡 Last candle: <b>${PAT[cd.p].n}</b> (textbook: ${TBW[PAT[cd.p].tb]}). History: ${oddsLine(cd.p)}.` : `💡 ${cd.why} Signals lean ${cd.pUp >= .5 ? 'Bull' : 'Bear'} ${Math.round(Math.max(cd.pUp, 1 - cd.pUp) * 100)}%.`) : 'Where will the next candle close?'}</div>
+        ${G.reveal && cd.real ? `<div class="lesson">📘 Last candle was <b>${PAT[cd.p].n}</b>: ${PAT[cd.p].d} Textbook says <b>${TBW[PAT[cd.p].tb]}</b>; ${oddsLine(cd.p)}.</div>` : ''}
         ${S.set.timer && !G.reveal ? '<div class="timer"><i id="tbar"></i></div>' : ''}
         <div class="stamp"></div></article></div>
     <div class="hintD">Swipe down · BEAR</div>
@@ -372,20 +443,35 @@ function playV(){
     <div class="res"><span>Coins this run <b>+${fmt(G.coins)}</b></span><span>Streak <b style="color:var(--gold)">x${G.streak}</b></span><span>${G.mode === 'daily' ? `Card <b>${Math.min(n + 1, 10)}/10</b>` : `Answered <b>${n}</b>`}</span></div>
     <button class="btn sm" data-act="quit">Quit run</button>`;
 }
+function quizV(){
+  const cd = G.card, n = G.res.length;
+  return `<div class="prog" aria-label="Question ${n + 1} of 10">${Array.from({length:10}, (_, i) => `<i class="${i < n ? (G.res[i] ? 'ok' : 'bad') : i === n ? 'cur' : ''}"></i>`).join('')}</div>
+    <div class="stack" style="height:auto"><article class="sc" id="sc" style="position:relative"><div class="nm"><b>${G.reveal ? esc(cd.name) : 'Pattern quiz'}</b><span>${G.reveal ? nd(cd.d) : 'real · daily candles'}</span></div>
+      ${chartSVG(cd, G.reveal)}
+      <div class="hint">${G.reveal ? `Next day (${nd(cd.dn)}) it closed <b style="color:${cd.up ? 'var(--up)' : 'var(--dn)'}">${cd.up ? 'higher' : 'lower'}</b>.` : 'What is the <b>highlighted last candle</b>?'}</div>
+      ${G.reveal ? `<div class="lesson">📘 <b>${PAT[cd.p].n}</b>: ${PAT[cd.p].d} Textbook says <b>${TBW[PAT[cd.p].tb]}</b>; ${oddsLine(cd.p)}.</div>` : ''}</article></div>
+    <div class="qopts">${cd.opts.map(k => `<button class="${G.reveal ? (k === cd.p ? 'right' : k === G.pick ? 'wrong' : '') : ''}" data-act="qa" data-k="${k}"${G.reveal ? ' disabled' : ''}>${PAT[k].n}</button>`).join('')}</div>
+    ${G.reveal ? `<button class="btn main" data-act="qnext">${n >= 10 ? 'See result' : 'Next question'}</button>` : ''}
+    <div class="res"><span>Coins this run <b>+${fmt(G.coins)}</b></span><span>Streak <b style="color:var(--gold)">x${G.streak}</b></span><span>Q <b>${Math.min(n + (G.reveal ? 0 : 1), 10)}/10</b></span></div>
+    <button class="btn sm" data-act="quit">Quit quiz</button>`;
+}
 function startV(){
   const acc = S.tot.n ? Math.round(S.tot.ok / S.tot.n * 100) : 0;
   return `<section class="card hero"><div class="duo"><span style="background:radial-gradient(circle at 35% 30%,#8ff7cd,#2ee59d 55%,#0f8f5e);box-shadow:0 0 30px var(--up);color:#03140d">${BULL.replace(/26/g, '40')}</span><span style="background:radial-gradient(circle at 35% 30%,#ffb0bb,#ff5d73 55%,#a3203a);box-shadow:0 0 30px var(--dn);color:#fff">${BEAR.replace(/26/g, '40')}</span></div>
-      <h2>Bull or Bear?</h2><p>Read the chart and guess the next candle. Swipe <b style="color:var(--up)">up</b> if it closes higher, <b style="color:var(--dn)">down</b> if lower. All prices are simulated.</p></section>
+      <h2>Bull or Bear?</h2><p>Read the chart and guess the next candle. Swipe <b style="color:var(--up)">up</b> if it closes higher, <b style="color:var(--dn)">down</b> if lower.</p></section>
+    <div class="srcs"><button class="${S.src === 'real' ? 'on' : ''}" data-act="src" data-v="real">📈 Real NSE charts</button><button class="${S.src === 'sim' ? 'on' : ''}" data-act="src" data-v="sim">🎲 Simulated</button></div>
     <div class="modes"><button class="mode" style="--c:#7c5cff" data-act="start" data-m="daily"><b>Daily run</b><span>10 cards · best ${S.best.daily}/10</span><i></i></button>
-      <button class="mode" style="--c:#ff4fa3" data-act="start" data-m="endless"><b>Endless</b><span>3 lives · best ${S.best.endless} right</span><i></i></button></div>
+      <button class="mode" style="--c:#ff4fa3" data-act="start" data-m="endless"><b>Endless</b><span>3 lives · best ${S.best.endless} right</span><i></i></button>
+      <button class="mode wide" style="--c:#12a874" data-act="start" data-m="quiz"><b>Pattern quiz</b><span>Name the candle pattern on real charts · 10 questions · best ${S.best.quiz || 0}/10</span><i></i></button></div>
+    <p style="font-size:12.5px;color:var(--muted);margin:8px 2px 0">${S.src === 'real' ? (REAL ? `Real daily candles of ${Object.keys(REAL.names).length} large NSE stocks, ${REAL.from}–${REAL.to.slice(0, 4)}. The name and date are hidden until you answer.` : 'Loading real charts…') : 'Made-up stocks with built-in momentum and bounce signals.'}</p>
     <div class="sec">Your record</div>
     <div class="card" style="display:flex;justify-content:space-around;text-align:center"><div><b style="font-family:Sora,sans-serif;font-size:22px">${acc}%</b><div style="font-size:12.5px;color:var(--muted)">accuracy</div></div><div><b style="font-family:Sora,sans-serif;font-size:22px">${S.games.length}</b><div style="font-size:12.5px;color:var(--muted)">games</div></div><div><b style="font-family:Sora,sans-serif;font-size:22px">x${S.best.streak}</b><div style="font-size:12.5px;color:var(--muted)">best streak</div></div></div>
-    <div class="card" style="font-size:13.5px;color:var(--muted);line-height:1.5"><b style="color:var(--text)">Scoring:</b> 100 coins per right answer, +20 for each answer in a streak (up to +100). A hint costs 50 coins and tells you what the chart signals and how strongly.</div>`;
+    <div class="card" style="font-size:13.5px;color:var(--muted);line-height:1.5"><b style="color:var(--text)">Scoring:</b> 100 coins per right answer, +20 for each answer in a streak (up to +100). A hint costs 50 coins and names the pattern with its real historical odds.</div>`;
 }
 function endV(){
   const ok = G.res.filter(Boolean).length, n = G.res.length, acc = n ? Math.round(ok / n * 100) : 0;
   return `<section class="card hero"><h2>${acc >= 80 ? 'Market wizard!' : acc >= 60 ? 'Sharp trader' : acc >= 40 ? 'Getting there' : 'Tough market'}</h2>
-    <p>${G.mode === 'daily' ? 'Daily run' : 'Endless'} finished · ${sd(Date.now())} · ${t12(Date.now())}</p>
+    <p>${G.mode === 'daily' ? 'Daily run' : G.mode === 'quiz' ? 'Pattern quiz' : 'Endless'} · ${G.src === 'real' ? 'real charts' : 'simulated'} finished · ${sd(Date.now())} · ${t12(Date.now())}</p>
     <div style="font-family:Sora,sans-serif;font-weight:800;font-size:52px;margin:10px 0 0">${ok}<span style="font-size:24px;color:var(--muted)">/${n}</span></div>
     <p>${acc}% right · +${fmt(G.coins)} coins · best streak x${G.bestStreak}</p>
     ${G.newBest ? '<p style="color:var(--gold);font-weight:800;margin-top:8px">🏆 New best score!</p>' : ''}
@@ -398,10 +484,27 @@ function statsV(){
   const tile = (k, l, v, s) => `<div class="tile" style="--c:${T[k]};--oc:${on(T[k])}"><div class="k">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   return `<div class="tiles">${tile('acc', 'Accuracy', acc + '%', `${fmt(S.tot.ok)} of ${fmt(S.tot.n)} right`)}${tile('games', 'Games', S.games.length, `Daily best ${S.best.daily}/10`)}${tile('coins', 'Coins', fmt(S.coins), 'balance')}${tile('streak', 'Best streak', 'x' + S.best.streak, `Endless best ${S.best.endless}`)}</div>
     <button class="editc" data-act="look">${Object.values(T).map(c => `<i style="--c:${c}"></i>`).join('')} Tile colours &amp; transparency</button>
+    ${oddsV()}
     <div class="sec">Accuracy, last ${last.length || 0} games</div>
     <div class="card">${last.length ? `<div class="bars">${last.map((g, i) => { const a = g.n ? g.ok / g.n : 0; return `<div><span>${Math.round(a * 100)}</span><i style="height:${Math.max(4, a * 100)}%;animation-delay:${i * 40}ms;${a >= .6 ? 'background:linear-gradient(var(--up),#12a874)' : a < .4 ? 'background:linear-gradient(var(--dn),#a3203a)' : ''}"></i></div>`; }).join('')}</div>` : '<div style="color:var(--muted);text-align:center;padding:20px">Play a game to see your chart.</div>'}</div>
-    <div class="sec">History</div><div class="card" style="padding:4px 14px">${[...S.games].reverse().slice(0, 30).map(g => `<div class="hist"><div>${g.mode === 'daily' ? 'Daily run' : 'Endless'}<small>${sd(g.t)} · ${t12(g.t)}</small></div><div style="text-align:right"><b>${g.ok}/${g.n}</b><small>+${fmt(g.coins)} coins</small></div></div>`).join('') || '<div style="color:var(--muted);padding:14px 0">No games yet.</div>'}</div>`;
+    <div class="sec">History</div><div class="card" style="padding:4px 14px">${[...S.games].reverse().slice(0, 30).map(g => `<div class="hist"><div>${g.mode === 'daily' ? 'Daily run' : g.mode === 'quiz' ? 'Pattern quiz' : 'Endless'}${g.src === 'real' ? ' · real' : g.src === 'sim' ? ' · simulated' : ''}<small>${sd(g.t)} · ${t12(g.t)}</small></div><div style="text-align:right"><b>${g.ok}/${g.n}</b><small>+${fmt(g.coins)} coins</small></div></div>`).join('') || '<div style="color:var(--muted);padding:14px 0">No games yet.</div>'}</div>`;
 }
+function oddsV(){
+  const R = S.real, base = REAL ? REAL.base.up / REAL.base.n : .508, acc = R.n ? R.ok / R.n : 0, z = R.n ? (acc - base) / Math.sqrt(base * (1 - base) / R.n) : 0;
+  const v = R.n < 30 ? ['Too early to tell', 'var(--muted)', `Play at least 30 real cards. You have ${R.n}.`] : z >= 2 ? ['Beating chance', 'var(--up)', 'Your edge is unlikely to be luck (more than 2 standard errors above chance).'] : z <= -2 ? ['Below chance', 'var(--dn)', 'Worse than guessing. Try the opposite of your instinct?'] : ['Looks like luck', 'var(--gold)', 'Not clearly different from a coin toss yet. That is normal: real candles are hard to predict.'];
+  const need = R.n ? Math.ceil((base + 2 * Math.sqrt(base * (1 - base) / Math.max(R.n, 1))) * 100) : 0;
+  const rows = REAL ? Object.entries(REAL.stats).filter(([k]) => k !== 'none').sort((a, b) => b[1].up / b[1].n - a[1].up / a[1].n) : [];
+  return `<div class="sec">Honest odds · real charts</div>
+    <div class="verdict" style="--c:${v[1]}"><b>${R.n ? Math.round(acc * 100) + '%' : '–'}</b><div style="font-weight:800">${v[0]}</div><div style="font-size:13px;color:var(--muted);margin-top:4px">${R.n} real cards · chance is ${(base * 100).toFixed(1)}% (share of up days)${R.n >= 30 ? ` · about ${need}% needed to clearly beat it` : ''}<br>${v[2]}</div></div>
+    ${S.quiz.n ? `<div class="card" style="margin-top:12px;display:flex;justify-content:space-between"><span>Pattern quiz accuracy</span><b>${Math.round(S.quiz.ok / S.quiz.n * 100)}% of ${S.quiz.n}</b></div>` : ''}
+    ${S.sim.n ? `<div class="card" style="display:flex;justify-content:space-between"><span>Simulated charts accuracy</span><b>${Math.round(S.sim.ok / S.sim.n * 100)}% of ${S.sim.n}</b></div>` : ''}
+    ${REAL ? `<div class="sec">What the data says · next day after each pattern</div><div class="card"><div class="odds"><span class="h">Pattern (textbook)</span><span class="h">Up next day</span><span class="h">Times</span>
+      ${rows.map(([k, st]) => { const u = st.up / st.n; return `<span>${PAT[k].n} <small style="color:var(--muted)">(${TBW[PAT[k].tb]})</small></span><b style="color:${u > base + .01 ? 'var(--up)' : u < base - .01 ? 'var(--dn)' : 'var(--text)'}">${(u * 100).toFixed(1)}%</b><span style="color:var(--muted)">${fmt(st.n)}</span><div class="bar"><i style="width:${u * 100}%;background:${u >= .5 ? 'var(--up)' : 'var(--dn)'}"></i><s></s></div>`; }).join('')}</div>
+      <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0">${Object.keys(REAL.names).length} large NSE stocks, ${REAL.from}–${REAL.to.slice(0, 4)}, ${fmt(REAL.base.n)} trading days; all days closed higher ${(base * 100).toFixed(1)}% of the time. Most textbook patterns barely move the odds, and some work in reverse.</p>
+      <button class="btn sm" data-act="guide">📘 Pattern guide</button></div>` : ''}`;
+}
+function sheetGuide(){ sheet(`<h3>📘 Pattern guide</h3>${Object.entries(PAT).filter(([k]) => k !== 'none').map(([k, p]) => { const st = pst(k);
+    return `<div class="pg"><div class="t"><span>${p.n}</span><span style="color:${p.tb === 'bull' ? 'var(--up)' : p.tb === 'bear' ? 'var(--dn)' : 'var(--muted)'}">${TBW[p.tb]}</span></div><p>${p.d}${st ? ` Real data: next day up ${pct(st.up, st.n).toFixed(1)}% (${fmt(st.n)} times).` : ''}</p></div>`; }).join('')}<button class="btn sm" data-act="close">Close</button>`); }
 function setV(){
   const T = theme(), sw = (k, l, s) => `<div class="row"><div><div style="font-weight:700">${l}</div>${s ? `<div style="font-size:12.5px;color:var(--muted)">${s}</div>` : ''}</div><button class="sw${S.set[k] ? ' on' : ''}" data-act="sw" data-k="${k}" role="switch" aria-checked="${!!S.set[k]}" aria-label="${l}"></button></div>`;
   return `<div class="sec" style="margin-top:4px">Theme</div><div class="thg">${THEMES.map(t => `<button class="thc${t.id === T.id ? ' on' : ''}" style="background:linear-gradient(150deg,${t.s2},${t.bg});color:${t.text}" data-act="theme" data-id="${t.id}"><div class="nm">${t.name}</div>${t.id === T.id ? '<span class="ck">✓</span>' : ''}<div class="pv"><i style="background:linear-gradient(135deg,${t.a[0]},${t.a[1]} 50%,${t.a[2]})"></i><i style="background:${t.s3}"></i><i style="background:${t.a[2]}"></i></div></button>`).join('')}</div>
@@ -462,7 +565,7 @@ function toast(m, act){ const t = $('toast'), b = $('tBtn'); $('tMsg').textConte
 $('tBtn').onclick = () => { const f = undoFn; undoFn = null; $('toast').classList.remove('show', 'act'); if (f) f(); };
 
 /* ============ swipe ============ */
-function bindSwipe(){ const c = $('sc'); if (!c || !G || G.reveal) return; let y0 = null, dy = 0;
+function bindSwipe(){ const c = $('sc'); if (!c || !G || G.reveal || G.mode === 'quiz') return; let y0 = null, dy = 0;
   c.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; y0 = e.clientY; dy = 0; c.classList.add('drag'); c.classList.remove('snap'); try { c.setPointerCapture(e.pointerId); } catch(_){} });
   c.addEventListener('pointermove', e => { if (y0 == null) return; dy = e.clientY - y0; c.style.transform = `translateY(${dy}px) rotate(${dy / 25}deg)`;
     c.style.boxShadow = dy < -30 ? '0 0 0 3px var(--up),0 0 30px var(--up)' : dy > 30 ? '0 0 0 3px var(--dn),0 0 30px var(--dn)' : ''; });
@@ -477,6 +580,8 @@ const A = {
   start: el => startGame(el.dataset.m),
   home: () => { G = null; snd('tap'); render(true); },
   quit: () => { if (!G) return; if (G.res.length) endGame(); else { G = null; clearInterval(TMR); render(true); } },
+  src: el => { S.src = el.dataset.v; save(); snd('tap'); render(); },
+  qa: el => quizAnswer(el.dataset.k), qnext: () => quizNext(), guide: () => { snd('tap'); sheetGuide(); },
   up: (el, e) => answer('up', e), down: (el, e) => answer('down', e), hint: () => hint(),
   theme: el => { setTheme(el.dataset.id); render(); },
   themenext: () => { const i = THEMES.findIndex(t => t.id === theme().id), n = THEMES[(i + 1) % THEMES.length]; setTheme(n.id); render(); toast(n.name); },
@@ -521,7 +626,7 @@ document.addEventListener('change', e => { const i = e.target;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); if (UI.tab === 'play' && G && !G.reveal) { if (e.key === 'ArrowUp') answer('up'); if (e.key === 'ArrowDown') answer('down'); } });
 const tick = () => { const d = new Date(); $('clock').textContent = `${d.getDate()} ${MON[d.getMonth()]} · ${t12(d)}`; };
 tick(); setInterval(tick, 15000);
-applyLook(); btnCss(); save(); render(true);
+applyLook(); btnCss(); save(); render(true); loadReal();
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
 </body>
